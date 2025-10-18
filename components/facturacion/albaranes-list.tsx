@@ -6,12 +6,12 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { MoreHorizontal, Eye, Download, FileText, Edit, Trash2, Search, Signature } from "lucide-react"
-import { createClient } from "./utils/supabase-browser"; 
-import { useState, useEffect } from "react" // Importación de useEffect y useState
+import { createClient } from "../../lib/supabase-browser.ts"; 
+import { useState, useEffect } from "react" // Importación corregida
 import { useRouter } from "next/navigation"
-import { SignatureModal } from "./signature-modal" 
+import { SignatureModal } from "./signature-modal" // Asume que el modal está en el mismo directorio
 
-// *** DATOS DE EJEMPLO para reserva (fallback) y tipado ***
+// *** TIPADO Y DATOS DE EJEMPLO para reserva (fallback) ***
 interface Albaran {
     id: string;
     pedido: string;
@@ -83,7 +83,7 @@ export function AlbaranesList() {
 
     // Función para manejar la edición (navegación)
     const handleEdit = (albaranId: string) => {
-        // CORRECCIÓN DE RUTA: Asegúrate de que esta ruta exista en /app/facturacion/albaran/editar/[albaranId]/page.tsx
+        // RUTA CORREGIDA: Apunta a /app/facturacion/albaran/editar/[albaranId]/page.tsx
         router.push(`/facturacion/albaran/editar/${albaranId}`);
     };
 
@@ -92,7 +92,7 @@ export function AlbaranesList() {
         const fetchAlbaranes = async () => {
             const supabase = createClient();
             
-            // Reemplaza 'albaranes' con el nombre real de tu tabla
+            // Reemplaza 'albaranes' con el nombre real de tu tabla en Supabase
             const { data, error } = await supabase
                 .from('albaranes') 
                 .select('*') 
@@ -100,14 +100,14 @@ export function AlbaranesList() {
 
             if (error) {
                 console.error("Error cargando albaranes:", error);
-                // Usar datos estáticos como fallback
+                // Usar datos estáticos como fallback si falla la conexión
                 setAlbaranes(albaranesData); 
             } else {
                 // Mapear los datos de Supabase al formato local
                 setAlbaranes(data.map(a => ({
                     ...a,
-                    id: a.numero_albaran || a.id, // Ajusta si el campo ID es diferente en tu DB
-                    signed: !!a.signed_at // asumiendo que 'signed_at' indica la firma
+                    id: a.numero_albaran || a.id, 
+                    signed: !!a.signed_at 
                 } as Albaran)));
             }
             setIsLoading(false);
@@ -116,14 +116,14 @@ export function AlbaranesList() {
         fetchAlbaranes();
     }, []);
 
-    // Filtrado
+    // Filtrado (se mantiene igual)
     const filteredAlbaranes = albaranes.filter(albaran =>
         albaran.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
         albaran.cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
         albaran.empresa.toLowerCase().includes(searchTerm.toLowerCase())
     );
     
-    // ** Agrega un estado de carga **
+    // Estado de carga (se mantiene igual)
     if (isLoading) {
         return <div className="text-center p-8 text-lg font-medium">Cargando albaranes...</div>;
     }
@@ -233,12 +233,8 @@ export function AlbaranesList() {
                     albaranId={selectedAlbaran.id}
                     onSignatureSave={(data) => {
                         console.log("Firma guardada para el albarán:", selectedAlbaran.id, data);
-                        // Aquí implementarías la lógica de Supabase para actualizar el albarán
-                        // (marcarlo como signed: true, subir la imagen, etc.)
+                        // Implementar aquí la lógica de Supabase para actualizar el albarán
                         setShowSignatureModal(false);
-
-                        // Opcional: Refrescar la lista de albaranes
-                        // fetchAlbaranes(); 
                     }}
                 />
             )}

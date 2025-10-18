@@ -1,6 +1,8 @@
 import { createBrowserClient } from "@supabase/ssr"
 
-// ** SÓLO EXPORTACIÓN NOMBRADA **
+/**
+ * Función que crea y devuelve un cliente de Supabase para usar en el lado del cliente (navegador).
+ */
 export function createClient() { 
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
