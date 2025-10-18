@@ -803,28 +803,28 @@ export function NuevoArticuloForm() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="poblacion">Población</Label>
-                  <Input
-                    id="poblacion"
-                    placeholder="Ciudad o pueblo"
-                    value={poblacion}
-                    onChange={(e) => setPoblacion(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
                   <Label htmlFor="codigo-postal">Código Postal</Label>
                   <PostalCodeInput
                     value={codigoPostal}
                     onChange={setCodigoPostal}
                     onCityChange={(city) => {
                       setPoblacion(city)
-                      toast.success(`Población actualizada: ${city}`)
+                      if (city) {
+                        toast.success(`Población actualizada: ${city}`)
+                      }
                     }}
                   />
                 </div>
+              </div>
+
+              {poblacion && (
+                <div className="space-y-2">
+                  <Label htmlFor="poblacion">Población</Label>
+                  <Input id="poblacion" value={poblacion} onChange={(e) => setPoblacion(e.target.value)} />
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="transporte">Medio de Transporte</Label>
                   <Select value={transporte} onValueChange={setTransporte}>
