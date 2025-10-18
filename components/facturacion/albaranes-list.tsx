@@ -6,14 +6,16 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { MoreHorizontal, Eye, Download, FileText, Edit, Trash2, Search, Signature } from "lucide-react"
-import { createClient } from "../../lib/supabase-browser.ts"; 
-import { useState, useEffect } from "react" // Importación corregida
+// ✅ RUTA CORREGIDA:
+import { createClient } from '../../lib/supabase-browser';
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { SignatureModal } from "./signature-modal" // Asume que el modal está en el mismo directorio
+import { SignatureModal } from "./signature-modal" 
 
-// *** TIPADO Y DATOS DE EJEMPLO para reserva (fallback) ***
+// *** 🐞 TIPADO CORREGIDO ***
 interface Albaran {
-    id: string;
+    id: string; // ✅ ESTE ES EL UUID DE SUPABASE
+    numeroAlbaran: string; // ✅ ESTE ES EL ID VISIBLE (Ej: ALB-2025-001)
     pedido: string;
     cliente: string;
     empresa: string;
@@ -24,31 +26,27 @@ interface Albaran {
     estado: string;
     facturado: boolean;
     numeroFactura: string | null;
-    signed: boolean;
+    signed: boolean; // Controlado localmente por la existencia de 'signed_at'
     firmaNombre?: string;
     firmaDNI?: string;
+    signed_at?: string | null; 
 }
 
+// Datos de ejemplo para fallback (actualizados al nuevo tipado)
 const albaranesData: Albaran[] = [
     {
-        id: "ALB-2025-001", pedido: "PED-2025-001", cliente: "María García R.", empresa: "Eventos Elegantes SL",
+        id: "UUID-001", numeroAlbaran: "ALB-2025-001", pedido: "PED-2025-001", cliente: "María García R.", empresa: "Eventos Elegantes SL",
         fechaEmision: "2025-01-10", fechaEntrega: "2025-01-15", direccion: "Hotel Majestic...",
         articulos: 5, estado: "entregado", facturado: true, numeroFactura: "FAC-2025-001",
         signed: false 
     },
     {
-        id: "ALB-2025-002", pedido: "PED-2025-002", cliente: "Juan Martínez L.", empresa: "Corporativo Eventos",
+        id: "UUID-002", numeroAlbaran: "ALB-2025-002", pedido: "PED-2025-002", cliente: "Juan Martínez L.", empresa: "Corporativo Eventos",
         fechaEmision: "2025-01-12", fechaEntrega: "2025-01-20", direccion: "Centro de Convenciones...",
         articulos: 3, estado: "entregado", facturado: false, numeroFactura: null,
         signed: true, 
         firmaNombre: "Juan Martínez López",
         firmaDNI: "12345678A"
-    },
-    {
-        id: "ALB-2025-003", pedido: "PED-2025-003", cliente: "Ana Fernández S.", empresa: "Bodas de Ensueño",
-        fechaEmision: "2025-01-08", fechaEntrega: "2025-01-12", direccion: "Finca El Olivar...",
-        articulos: 8, estado: "pendiente", facturado: false, numeroFactura: null,
-        signed: false 
     },
 ]
 
@@ -67,6 +65,22 @@ const statusLabels: { [key: string]: string } = {
     borrador: "Borrador",
 }
 
+// --- 🐞 FUNCIÓN DE MAPEO CORREGIDA ---
+const mapSupabaseToAlbaran = (data: any[]): Albaran[] => {
+    return data.map(a => ({
+        ...a,
+        id: a.id, // ✅ El id real (UUID)
+        numeroAlbaran: a.numero_albaran || a.id, // El id visible
+        fechaEmision: a.fecha_emision || a.fechaEmision,
+        fechaEntrega: a.fecha_entrega || a.fechaEntrega,
+        numeroFactura: a.numero_factura || a.numeroFactura,
+        signed: !!a.signed_at, 
+        firmaNombre: a.firma_nombre || a.firmaNombre,
+        firmaDNI: a.firma_dni || a.firmaDNI,
+    }));
+};
+
+
 export function AlbaranesList() {
     const router = useRouter();
     const [searchTerm, setSearchTerm] = useState("");
@@ -75,55 +89,85 @@ export function AlbaranesList() {
     const [showSignatureModal, setShowSignatureModal] = useState(false);
     const [selectedAlbaran, setSelectedAlbaran] = useState<Albaran | null>(null);
 
-    // Función para manejar la firma
+    // Función para recargar los albaranes
+    const fetchAlbaranes = async () => {
+        // No seteamos isLoading(true) aquí para evitar parpadeo al recargar
+        const supabase = createClient();
+        
+        const { data, error } = await supabase
+            .from('albaranes') 
+            .select('*') 
+            .order('fechaEmision', { ascending: false });
+
+        if (error) {
+            console.error("Error cargando albaranes:", error);
+            setAlbaranes(albaranesData); 
+        } else {
+            setAlbaranes(mapSupabaseToAlbaran(data));
+        }
+        setIsLoading(false);
+    };
+
+    // Carga inicial de datos
+    useEffect(() => {
+        setIsLoading(true); // Solo en la carga inicial
+        fetchAlbaranes();
+    }, []);
+
+    // --- MANEJADORES DE ACCIONES ---
+
     const handleSign = (albaran: Albaran) => {
         setSelectedAlbaran(albaran);
         setShowSignatureModal(true);
     };
 
-    // Función para manejar la edición (navegación)
+    const handleSignatureSave = async (signatureData: { firmaNombre: string, firmaDNI: string, firmaImagen: string }) => {
+        if (!selectedAlbaran) return;
+
+        const supabase = createClient();
+        
+        // ✅ AHORA selectedAlbaran.id ES EL UUID CORRECTO
+        const { error } = await supabase
+            .from('albaranes')
+            .update({
+                firma_nombre: signatureData.firmaNombre,
+                firma_dni: signatureData.firmaDNI,
+                firma_imagen_url: signatureData.firmaImagen, 
+                signed_at: new Date().toISOString(), 
+            })
+            .eq('id', selectedAlbaran.id); // ✅ La consulta funcionará
+
+        if (error) {
+            console.error("Error al guardar la firma:", error);
+        } else {
+            console.log("Firma guardada con éxito");
+            setShowSignatureModal(false);
+            fetchAlbaranes(); // Recarga los datos
+        }
+    };
+
     const handleEdit = (albaranId: string) => {
-        // RUTA CORREGIDA: Apunta a /app/facturacion/albaran/editar/[albaranId]/page.tsx
+        // ✅ albaranId es el UUID, perfecto para la página de edición
         router.push(`/facturacion/albaran/editar/${albaranId}`);
     };
 
-    // ** LÓGICA PARA CARGAR DATOS DE SUPABASE **
-    useEffect(() => {
-        const fetchAlbaranes = async () => {
-            const supabase = createClient();
-            
-            // Reemplaza 'albaranes' con el nombre real de tu tabla en Supabase
-            const { data, error } = await supabase
-                .from('albaranes') 
-                .select('*') 
-                .order('fechaEmision', { ascending: false });
+    const handleDelete = async (albaranId: string) => {
+        // ✅ albaranId es el UUID, listo para borrar
+        console.log("Eliminar albarán:", albaranId);
+        // const supabase = createClient();
+        // const { error } = await supabase.from('albaranes').delete().eq('id', albaranId);
+        // if (!error) fetchAlbaranes();
+    };
 
-            if (error) {
-                console.error("Error cargando albaranes:", error);
-                // Usar datos estáticos como fallback si falla la conexión
-                setAlbaranes(albaranesData); 
-            } else {
-                // Mapear los datos de Supabase al formato local
-                setAlbaranes(data.map(a => ({
-                    ...a,
-                    id: a.numero_albaran || a.id, 
-                    signed: !!a.signed_at 
-                } as Albaran)));
-            }
-            setIsLoading(false);
-        };
 
-        fetchAlbaranes();
-    }, []);
+    // --- RENDERIZADO ---
 
-    // Filtrado (se mantiene igual)
     const filteredAlbaranes = albaranes.filter(albaran =>
-        albaran.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        albaran.cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        albaran.empresa.toLowerCase().includes(searchTerm.toLowerCase())
+        (albaran.numeroAlbaran && albaran.numeroAlbaran.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (albaran.cliente && albaran.cliente.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (albaran.empresa && albaran.empresa.toLowerCase().includes(searchTerm.toLowerCase()))
     );
     
-    // Estado de carga (se mantiene igual)
     if (isLoading) {
         return <div className="text-center p-8 text-lg font-medium">Cargando albaranes...</div>;
     }
@@ -162,8 +206,10 @@ export function AlbaranesList() {
                             <tbody className="bg-card divide-y divide-border">
                                 {filteredAlbaranes.length > 0 ? (
                                     filteredAlbaranes.map((albaran) => (
+                                        // ✅ 'key' usa el 'id' (UUID) único
                                         <tr key={albaran.id}>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-card-foreground">{albaran.id}</td>
+                                            {/* ✅ Muestra el 'numeroAlbaran' visible */}
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-card-foreground">{albaran.numeroAlbaran}</td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <div className="text-sm font-medium text-card-foreground">{albaran.cliente}</div>
                                                 <div className="text-xs text-muted-foreground">{albaran.empresa}</div>
@@ -187,6 +233,7 @@ export function AlbaranesList() {
                                                         </Button>
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end">
+                                                        {/* ✅ TODAS las acciones usan 'albaran.id' (el UUID) */}
                                                         <DropdownMenuItem onClick={() => router.push(`/facturacion/albaran/detalle/${albaran.id}`)}>
                                                             <Eye className="mr-2 h-4 w-4" />
                                                             Ver Detalles
@@ -203,7 +250,7 @@ export function AlbaranesList() {
                                                             <Signature className="mr-2 h-4 w-4" />
                                                             Firmar {!albaran.signed ? '' : '(Firmado)'}
                                                         </DropdownMenuItem>
-                                                        <DropdownMenuItem className="text-red-600">
+                                                        <DropdownMenuItem className="text-red-600" onClick={() => handleDelete(albaran.id)} disabled={albaran.signed}>
                                                             <Trash2 className="mr-2 h-4 w-4" />
                                                             Eliminar
                                                         </DropdownMenuItem>
@@ -215,7 +262,7 @@ export function AlbaranesList() {
                                 ) : (
                                     <tr>
                                         <td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">
-                                            No se encontraron albaranes o la tabla de Supabase está vacía.
+                                            No se encontraron albaranes que coincidan con la búsqueda.
                                         </td>
                                     </tr>
                                 )}
@@ -230,12 +277,8 @@ export function AlbaranesList() {
                 <SignatureModal 
                     isOpen={showSignatureModal}
                     onClose={() => setShowSignatureModal(false)}
-                    albaranId={selectedAlbaran.id}
-                    onSignatureSave={(data) => {
-                        console.log("Firma guardada para el albarán:", selectedAlbaran.id, data);
-                        // Implementar aquí la lógica de Supabase para actualizar el albarán
-                        setShowSignatureModal(false);
-                    }}
+                    albaranId={selectedAlbaran.numeroAlbaran} // ✅ Pasa el ID visible (ALB-...) al modal
+                    onSignatureSave={handleSignatureSave} 
                 />
             )}
         </div>
