@@ -1,18 +1,17 @@
 "use server"
 
-import { createServerClient } from "@/lib/supabase/server"
+import { createClient } from "@/lib/supabase/server"
 
 export async function uploadImage(formData: FormData) {
-  const supabase = createServerClient()
-  if (!supabase) {
-    return { success: false, error: "Supabase no configurado" }
-  }
-
   try {
+    const supabase = await createClient()
+
     const file = formData.get("file") as File
     if (!file) {
       return { success: false, error: "No se proporcionó archivo" }
     }
+
+    console.log("[v0] Subiendo imagen:", file.name, "Tamaño:", file.size)
 
     // Generar nombre único para el archivo
     const fileExt = file.name.split(".").pop()
@@ -26,14 +25,18 @@ export async function uploadImage(formData: FormData) {
     })
 
     if (error) {
-      console.error("[v0] Error subiendo imagen:", error)
+      console.error("[v0] Error subiendo imagen a Supabase Storage:", error)
       return { success: false, error: error.message }
     }
+
+    console.log("[v0] Imagen subida exitosamente:", data)
 
     // Obtener URL pública
     const {
       data: { publicUrl },
     } = supabase.storage.from("imagenes").getPublicUrl(filePath)
+
+    console.log("[v0] URL pública generada:", publicUrl)
 
     return { success: true, url: publicUrl, path: filePath }
   } catch (error: any) {
@@ -43,12 +46,9 @@ export async function uploadImage(formData: FormData) {
 }
 
 export async function deleteImage(path: string) {
-  const supabase = createServerClient()
-  if (!supabase) {
-    return { success: false, error: "Supabase no configurado" }
-  }
-
   try {
+    const supabase = await createClient()
+
     const { error } = await supabase.storage.from("imagenes").remove([path])
 
     if (error) {
