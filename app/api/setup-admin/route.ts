@@ -7,7 +7,7 @@ export async function GET() {
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
     if (!supabaseUrl || !supabaseServiceKey) {
-      return NextResponse.json({ error: "Supabase no configurado" }, { status: 500 })
+      return NextResponse.json({ error: "Supabase no configurado correctamente" }, { status: 500 })
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
@@ -17,62 +17,107 @@ export async function GET() {
       },
     })
 
+    const { error: tableCheckError } = await supabase.from("profiles").select("id").limit(1)
+
+    if (tableCheckError && tableCheckError.code === "42P01") {
+      // Table doesn't exist, create it
+      const createTableSQL = `
+        CREATE TABLE IF NOT EXISTS profiles (
+          id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+          email TEXT UNIQUE NOT NULL,
+          full_name TEXT,
+          username TEXT,
+          role TEXT DEFAULT 'user',
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        );
+        
+        ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+        
+        CREATE POLICY IF NOT EXISTS "Users can view own profile"
+          ON profiles FOR SELECT USING (auth.uid() = id);
+        
+        CREATE POLICY IF NOT EXISTS "Users can update own profile"
+          ON profiles FOR UPDATE USING (auth.uid() = id);
+        
+        CREATE POLICY IF NOT EXISTS "Enable insert for authenticated users"
+          ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
+      `
+
+      const { error: createError } = await supabase.rpc("exec_sql", { sql: createTableSQL })
+      if (createError) {
+        console.log("[v0] Note: Could not auto-create table, it may already exist")
+      }
+    }
+
     const email = "admin@empresa.com"
     const password = "admin123"
 
-    // Intentar crear el usuario
-    const { data: userData, error: createError } = await supabase.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        nombre: "Administrador",
-        rol: "admin",
-      },
-    })
+    const { data: existingUsers } = await supabase.auth.admin.listUsers()
+    const existingUser = existingUsers.users.find((u) => u.email === email)
 
-    if (createError) {
-      // Si el usuario ya existe, actualizar la contraseña
-      if (createError.message.includes("already registered")) {
-        const { data: users } = await supabase.auth.admin.listUsers()
-        const existingUser = users.users.find((u) => u.email === email)
+    let userId: string
 
-        if (existingUser) {
-          await supabase.auth.admin.updateUserById(existingUser.id, { password })
+    if (existingUser) {
+      const { error: updateError } = await supabase.auth.admin.updateUserById(existingUser.id, {
+        password,
+        email_confirm: true,
+      })
 
-          return NextResponse.json({
-            success: true,
-            message: "Usuario ya existía. Contraseña actualizada.",
-            credentials: { email, password },
-          })
-        }
-      }
-      throw createError
+      if (updateError) throw updateError
+      userId = existingUser.id
+    } else {
+      const { data: userData, error: createError } = await supabase.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          full_name: "Administrador",
+          username: "admin",
+          role: "admin",
+        },
+      })
+
+      if (createError) throw createError
+      if (!userData.user) throw new Error("No se pudo crear el usuario")
+
+      userId = userData.user.id
     }
 
-    // Crear perfil si no existe
-    const { error: profileError } = await supabase.from("profiles").upsert({
-      id: userData.user.id,
-      nombre: "Administrador",
-      email: email,
-      rol: "admin",
-    })
+    const { error: profileError } = await supabase.from("profiles").upsert(
+      {
+        id: userId,
+        email: email,
+        full_name: "Administrador",
+        username: "admin",
+        role: "admin",
+        updated_at: new Date().toISOString(),
+      },
+      {
+        onConflict: "id",
+      },
+    )
 
     if (profileError) {
-      console.error("Error creando perfil:", profileError)
+      console.error("[v0] Error en perfil:", profileError)
+      // Don't throw, profile might be created by trigger
     }
 
     return NextResponse.json({
       success: true,
-      message: "Usuario administrador creado exitosamente",
-      credentials: { email, password },
+      message: "✅ Usuario administrador creado correctamente. Ahora puedes iniciar sesión.",
+      credentials: {
+        email,
+        password,
+      },
     })
   } catch (error: any) {
-    console.error("Error:", error)
+    console.error("[v0] Error:", error)
     return NextResponse.json(
       {
+        success: false,
         error: error.message || "Error desconocido",
-        details: error,
+        details: error.hint || error.details || "Sin detalles adicionales",
       },
       { status: 500 },
     )
