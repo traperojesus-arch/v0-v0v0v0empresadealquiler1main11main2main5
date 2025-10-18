@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { MoreHorizontal, Eye, Download, FileText, Edit, Trash2, Search, Signature } from "lucide-react"
 // ✅ RUTA CORREGIDA:
-import { createClient } from '../../lib/supabase-browser';
+import { createClient } from '@/lib/supabase-browser';
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { SignatureModal } from "./signature-modal" 
