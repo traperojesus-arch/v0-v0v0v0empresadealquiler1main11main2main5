@@ -72,6 +72,11 @@ export async function createArticulo(formData: {
   cantidad_total: number
   estado: string
   imagen_url?: string
+  imagenes?: string[]
+  coste_compra?: number
+  fecha_compra?: string
+  proveedor?: string
+  entidades?: string[]
 }) {
   if (!shouldUseSupabase()) {
     const newArticulo = mockStore.addArticulo({
@@ -82,7 +87,7 @@ export async function createArticulo(formData: {
       precio_dia: formData.precio_alquiler,
       stock_total: formData.cantidad_total,
       stock_disponible: formData.cantidad_disponible,
-      imagenes: formData.imagen_url ? [formData.imagen_url] : [],
+      imagenes: formData.imagenes || (formData.imagen_url ? [formData.imagen_url] : []),
     })
     revalidatePath("/articulos")
     return { success: true, data: newArticulo }
@@ -94,12 +99,48 @@ export async function createArticulo(formData: {
   }
 
   try {
-    const { data, error } = await supabase.from("articulos").insert([formData]).select().single()
+    const articuloData = {
+      nombre: formData.nombre,
+      descripcion: formData.descripcion,
+      categoria: formData.categoria,
+      precio_dia: formData.precio_alquiler,
+      stock_total: formData.cantidad_total,
+      stock_disponible: formData.cantidad_disponible,
+      estado: formData.estado,
+      imagenes: formData.imagenes || [],
+      coste_compra: formData.coste_compra,
+      fecha_compra: formData.fecha_compra,
+      proveedor: formData.proveedor,
+      activo: true,
+    }
 
-    if (error) throw error
+    const { data: articulo, error: articuloError } = await supabase
+      .from("articulos")
+      .insert([articuloData])
+      .select()
+      .single()
+
+    if (articuloError) throw articuloError
+
+    if (formData.entidades && formData.entidades.length > 0) {
+      const entidadesData = formData.entidades.map((codigo) => ({
+        articulo_id: articulo.id,
+        codigo_unico: codigo,
+        estado: "disponible",
+        ubicacion: null,
+        notas: null,
+      }))
+
+      const { error: entidadesError } = await supabase.from("entidades_articulos").insert(entidadesData)
+
+      if (entidadesError) {
+        console.error("[v0] Error creando entidades:", entidadesError)
+        // No fallar si las entidades no se crean, el artículo ya está creado
+      }
+    }
 
     revalidatePath("/articulos")
-    return { success: true, data }
+    return { success: true, data: articulo }
   } catch (error) {
     console.error("[v0] Error creando artículo:", error)
     return { success: false, error: "Error al crear artículo" }
@@ -117,6 +158,11 @@ export async function updateArticulo(
     cantidad_total?: number
     estado?: string
     imagen_url?: string
+    imagenes?: string[]
+    coste_compra?: number
+    fecha_compra?: string
+    proveedor?: string
+    entidades?: string[]
   },
 ) {
   if (!shouldUseSupabase()) {
@@ -127,7 +173,7 @@ export async function updateArticulo(
       precio_dia: formData.precio_alquiler,
       stock_total: formData.cantidad_total,
       stock_disponible: formData.cantidad_disponible,
-      imagenes: formData.imagen_url ? [formData.imagen_url] : undefined,
+      imagenes: formData.imagenes || (formData.imagen_url ? [formData.imagen_url] : undefined),
     })
     revalidatePath("/articulos")
     return { success: true, data: updated }
