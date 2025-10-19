@@ -10,13 +10,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 export default function NuevoPedidoPage() {
   return (
     <div className="flex min-h-screen bg-background">
-      <Sidebar />
+     <Sidebar />
       <div className="flex-1 flex flex-col">
         <DashboardHeader />
         <main className="flex-1 p-6 space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">Nuevo Pedido</h1>
+                <h1 className="text-3xl font-bold tracking-tight">Nuevo Pedido</h1>
               <p className="text-muted-foreground">Crear un nuevo pedido de alquiler</p>
             </div>
           </div>
