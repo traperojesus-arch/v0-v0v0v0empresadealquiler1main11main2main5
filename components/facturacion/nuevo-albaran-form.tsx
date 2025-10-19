@@ -1,7 +1,8 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -11,7 +12,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowLeft, Save, Plus, Trash2 } from "lucide-react"
 import Link from "next/link"
-import { mockStore } from "@/lib/mock-data-store"
 
 export function NuevoAlbaranForm() {
   const router = useRouter()
@@ -26,35 +26,10 @@ export function NuevoAlbaranForm() {
     observaciones: "",
   })
 
-  const [articulos, setArticulos] = useState([{ articulo_id: "", descripcion: "", cantidad: 1 }])
-
-  // Datos de ejemplo que vendrían de la base de datos
-  const pedidos = mockStore.getReservas()
-  const empleados = [
-    { id: "emp1", nombre: "Carlos Ruiz" },
-    { id: "emp2", nombre: "Ana López" },
-  ]
-
-  useEffect(() => {
-    if (formData.pedidoId) {
-      const pedidoSeleccionado = pedidos.find((p) => p.id === formData.pedidoId)
-      if (pedidoSeleccionado) {
-        setFormData((prev) => ({
-          ...prev,
-          fechaEntrega: pedidoSeleccionado.fecha_desde,
-          direccionEntrega: pedidoSeleccionado.ubicacion || "",
-        }))
-        setArticulos(
-          pedidoSeleccionado.articulos.map((a) => ({ ...a, descripcion: a.nombre })) || [
-            { articulo_id: "", descripcion: "", cantidad: 1 },
-          ],
-        )
-      }
-    }
-  }, [formData.pedidoId])
+  const [articulos, setArticulos] = useState([{ articuloId: "", descripcion: "", cantidad: 1 }])
 
   const agregarArticulo = () => {
-    setArticulos([...articulos, { articulo_id: "", descripcion: "", cantidad: 1 }])
+    setArticulos([...articulos, { articuloId: "", descripcion: "", cantidad: 1 }])
   }
 
   const eliminarArticulo = (index: number) => {
@@ -117,9 +92,9 @@ export function NuevoAlbaranForm() {
                     <SelectValue placeholder="Seleccionar pedido" />
                   </SelectTrigger>
                   <SelectContent>
-                    {pedidos.map((pedido) => (
-                      <SelectItem key={pedido.id} value={pedido.id}>{`${pedido.numeroPedido} - ${pedido.cliente}`}</SelectItem>
-                    ))}
+                    <SelectItem value="pedido1">PED-2025-001 - María García</SelectItem>
+                    <SelectItem value="pedido2">PED-2025-002 - Juan Martínez</SelectItem>
+                    <SelectItem value="pedido3">PED-2025-003 - Ana Fernández</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -162,19 +137,12 @@ export function NuevoAlbaranForm() {
 
             <div>
               <Label htmlFor="responsableEntrega">Responsable de Entrega</Label>
-              <Select
+              <Input
+                id="responsableEntrega"
                 value={formData.responsableEntrega}
-                onValueChange={(value) => setFormData({ ...formData, responsableEntrega: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar responsable" />
-                </SelectTrigger>
-                <SelectContent>
-                  {empleados.map((emp) => (
-                    <SelectItem key={emp.id} value={emp.nombre}>{emp.nombre}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={(e) => setFormData({ ...formData, responsableEntrega: e.target.value })}
+                placeholder="Nombre del responsable"
+              />
             </div>
 
             <div>
@@ -217,7 +185,7 @@ export function NuevoAlbaranForm() {
                     <Label>Descripción</Label>
                     <Input
                       value={articulo.descripcion}
-                      onChange={(e) => actualizarArticulo(index, "descripcion", e.target.value)} // `descripcion` en lugar de `nombre`
+                      onChange={(e) => actualizarArticulo(index, "descripcion", e.target.value)}
                       placeholder="Descripción del artículo"
                       required
                     />
